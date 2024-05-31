@@ -3,14 +3,15 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const ejs = require('ejs');
+const pug = require('pug');
 const app = express();
 const port = 3000;
 
-const secretKey = 'your_secret_key'; // Секретний ключ для JWT
+const secretKey = 'my_secret_key';
 
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
-app.engine('ejs', require('ejs').__express);
+app.engine('ejs', ejs.__express);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
