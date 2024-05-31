@@ -1,18 +1,25 @@
 const express = require('express');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const ejs = require('ejs');
 const app = express();
 const port = 3000;
-const ejs = require('ejs');
+
+const secretKey = 'your_secret_key'; // Секретний ключ для JWT
+
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
-
 app.engine('ejs', require('ejs').__express);
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 const users = [
-  { id: 1, name: 'User One', email: 'userone@example.com' },
-  { id: 2, name: 'User Two', email: 'usertwo@example.com' }
+  { id: 1, name: 'User One', email: 'userone@example.com', password: 'password1' },
+  { id: 2, name: 'User Two', email: 'usertwo@example.com', password: 'password2' }
 ];
 
 const articles = [
@@ -20,15 +27,29 @@ const articles = [
   { id: 2, title: 'Article Two', content: 'Content of article two.' }
 ];
 
+function authenticateToken(req, res, next) {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).send('Unauthorized');
+  }
+  jwt.verify(token, secretKey, (err, user) => {
+    if (err) {
+      return res.status(403).send('Forbidden');
+    }
+    req.user = user;
+    next();
+  });
+}
+
 app.get('/', (req, res) => {
   res.render('pug/index');
 });
 
-app.get('/users', (req, res) => {
+app.get('/users', authenticateToken, (req, res) => {
   res.render('pug/users', { users });
 });
 
-app.get('/users/:userId', (req, res) => {
+app.get('/users/:userId', authenticateToken, (req, res) => {
   const user = users.find(u => u.id == req.params.userId);
   if (user) {
     res.render('pug/user', { user });
@@ -62,6 +83,31 @@ app.get('/articles/:articleId', (req, res) => {
   } else {
     res.status(404).send('Article not found');
   }
+});
+
+app.post('/register', (req, res) => {
+  const { name, email, password } = req.body;
+  const user = { id: users.length + 1, name, email, password };
+  users.push(user);
+  res.status(201).send('User registered');
+});
+
+app.post('/login', (req, res) => {
+  const { email, password } = req.body;
+  const user = users.find(u => u.email === email && u.password === password);
+  if (!user) {
+    return res.status(401).send('Invalid credentials');
+  }
+  const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, secretKey, { expiresIn: '1h' });
+  res.cookie('token', token, { httpOnly: true });
+  res.send('Logged in');
+});
+
+app.post('/theme', (req, res) => {
+  const { theme } = req.body;
+  res.cookie('theme', theme, { maxAge: 900000, httpOnly: true });
+  res.send('Theme saved');
+
 });
 
 app.use((err, req, res, next) => {
